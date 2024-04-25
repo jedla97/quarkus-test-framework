@@ -58,6 +58,9 @@ jobs:
           cache: 'maven'
       - name: Build Quarkus 3.2
         run: |
+          ./quarkus-dev-cli version
+          ./quarkus-dev-cli --version
+          ./quarkus-dev-cli -v
           git clone https://github.com/quarkusio/quarkus.git && cd quarkus && git checkout 3.2 && ./mvnw -B -s .github/mvn-settings.xml clean install -Dquickly -Dno-test-modules -Prelocations
       - name: Tar Maven Repo
         shell: bash
