@@ -38,6 +38,13 @@ public class QuarkusCliClientIT {
 
     @Test
     public void shouldVersionMatchQuarkusVersion() {
+        System.out.println("-------JEDLA--------");
+        System.out.println(QuarkusProperties.getVersion());
+        System.out.println("-------JEDLA--------");
+        System.out.println(cliClient.run("--version").getOutput());
+        System.out.println("-------JEDLA--------");
+        System.out.println(cliClient.run("-v").getOutput());
+        System.out.println("-------JEDLA--------");
         // Using option
         assertEquals(QuarkusProperties.getVersion(), cliClient.run("--version").getOutput());
 
