@@ -58,9 +58,6 @@ jobs:
           cache: 'maven'
       - name: Build Quarkus 3.2
         run: |
-          ./quarkus-dev-cli version
-          ./quarkus-dev-cli --version
-          ./quarkus-dev-cli -v
           git clone https://github.com/quarkusio/quarkus.git && cd quarkus && git checkout 3.2 && ./mvnw -B -s .github/mvn-settings.xml clean install -Dquickly -Dno-test-modules -Prelocations
       - name: Tar Maven Repo
         shell: bash
@@ -111,6 +108,9 @@ jobs:
           ./quarkus-dev-cli version
       - name: Build in JVM mode
         run: |
+          ./quarkus-dev-cli version
+          ./quarkus-dev-cli --version
+          ./quarkus-dev-cli -v
           mvn -B -fae -s .github/mvn-settings.xml clean install -Pframework,examples,extensions -Drun-cli-tests -pl quarkus-test-cli -Dts.quarkus.cli.cmd="${PWD}/quarkus-dev-cli" -Dquarkus.platform.version="${{ matrix.quarkus-version }}"
       - name: Zip Artifacts
         run: |
