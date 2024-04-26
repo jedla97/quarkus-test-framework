@@ -108,9 +108,12 @@ jobs:
           ./quarkus-dev-cli version
       - name: Build in JVM mode
         run: |
-          ./quarkus-dev-cli version
-          ./quarkus-dev-cli --version
-          ./quarkus-dev-cli -v
+          quarkus-dev-cli version
+          quarkus-dev-cli --version
+          quarkus-dev-cli -v
+          ${PWD}/quarkus-dev-cli version
+          ${PWD}/quarkus-dev-cli --version
+          ${PWD}/quarkus-dev-cli -v
           mvn -B -fae -s .github/mvn-settings.xml clean install -Pframework,examples,extensions -Drun-cli-tests -pl quarkus-test-cli -Dts.quarkus.cli.cmd="${PWD}/quarkus-dev-cli" -Dquarkus.platform.version="${{ matrix.quarkus-version }}"
       - name: Zip Artifacts
         run: |
