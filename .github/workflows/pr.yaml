@@ -108,9 +108,9 @@ jobs:
           ./quarkus-dev-cli version
       - name: Build in JVM mode
         run: |
-          quarkus-dev-cli version
-          quarkus-dev-cli --version
-          quarkus-dev-cli -v
+          ./quarkus-dev-cli version
+          ./quarkus-dev-cli --version
+          ./quarkus-dev-cli -v
           ${PWD}/quarkus-dev-cli version
           ${PWD}/quarkus-dev-cli --version
           ${PWD}/quarkus-dev-cli -v
