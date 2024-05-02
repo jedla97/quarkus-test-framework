@@ -5,37 +5,6 @@ on:
   schedule:
     - cron: '0 22 * * *'
 jobs:
-  validate-format:
-    name: Validate format
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        java: [ 11 ]
-    steps:
-      - uses: actions/checkout@v4
-      - name: Reclaim Disk Space
-        run: .github/ci-prerequisites.sh
-      - name: Install required tools
-        run: sudo apt update && sudo apt install pigz
-      - name: Install JDK {{ matrix.java }}
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: ${{ matrix.java }}
-          check-latest: true
-          cache: 'maven'
-      - name: Build with Maven
-        run: |
-          mvn -V -B -s .github/mvn-settings.xml clean install -Pframework,examples -Dvalidate-format -DskipTests -DskipITs
-      - name: Tar Maven Repo
-        shell: bash
-        run: tar -I 'pigz -9' -cf maven-repo-current-fw.tgz -C ~ .m2/repository
-      - name: Persist Maven Repo
-        uses: actions/upload-artifact@v3
-        with:
-          name: maven-repo-current-fw
-          path: maven-repo-current-fw.tgz
-          retention-days: 1
   quarkus-main-build:
     name: Quarkus 3.2 build
     runs-on: ubuntu-latest
@@ -108,10 +77,8 @@ jobs:
           ./quarkus-dev-cli version
       - name: Build in JVM mode
         run: |
-          ./quarkus-dev-cli version -Dquarkus.analytics.disabled=true
           ./quarkus-dev-cli --version -Dquarkus.analytics.disabled=true
           ./quarkus-dev-cli -v -Dquarkus.analytics.disabled=true
-          ${PWD}/quarkus-dev-cli version -Dquarkus.analytics.disabled=true
           ${PWD}/quarkus-dev-cli --version -Dquarkus.analytics.disabled=true
           ${PWD}/quarkus-dev-cli -v -Dquarkus.analytics.disabled=true
           mvn -B -fae -s .github/mvn-settings.xml clean install -Pframework,examples,extensions -Drun-cli-tests -pl quarkus-test-cli -Dts.quarkus.cli.cmd="${PWD}/quarkus-dev-cli" -Dquarkus.platform.version="${{ matrix.quarkus-version }}"
