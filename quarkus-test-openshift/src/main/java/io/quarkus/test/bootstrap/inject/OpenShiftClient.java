@@ -236,7 +236,9 @@ public final class OpenShiftClient {
         deployment.getSpec().getTemplate().getSpec().getContainers().forEach(container -> {
             enrichProperties.forEach((key, value) -> container.getEnv().add(new EnvVar(key, value, null)));
         });
-        client.apps().deployments().resource(deployment).unlock().createOr(NonDeletingOperation::patch);
+        deployment.setMetadata(new ObjectMeta());
+        deployment.getMetadata().setName(service.getName());
+        client.apps().deployments().resource(deployment).unlock().createOr(NonDeletingOperation::update);
     }
 
     private void updateAnnotationsIfNecessary(Service service, String serviceName) {
