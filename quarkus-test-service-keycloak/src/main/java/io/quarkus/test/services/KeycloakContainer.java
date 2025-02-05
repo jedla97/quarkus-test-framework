@@ -16,7 +16,7 @@ import io.quarkus.test.services.containers.KeycloakContainerManagedResourceBuild
 public @interface KeycloakContainer {
     String image() default "quay.io/keycloak/keycloak:26.0";
 
-    int port() default 8080;
+    int port() default 8443;
 
     String expectedLog() default "started in";
 
