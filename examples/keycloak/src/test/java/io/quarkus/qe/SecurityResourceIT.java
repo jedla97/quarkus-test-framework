@@ -11,7 +11,8 @@ public class SecurityResourceIT extends BaseSecurityResourceIT {
     static final RestService app = new RestService()
             .withProperty("quarkus.oidc.auth-server-url", keycloak::getRealmUrl)
             .withProperty("quarkus.oidc.client-id", CLIENT_ID_DEFAULT)
-            .withProperty("quarkus.oidc.credentials.secret", CLIENT_SECRET_DEFAULT);
+            .withProperty("quarkus.oidc.credentials.secret", CLIENT_SECRET_DEFAULT)
+            .withProperty("quarkus.tls.trust-store.pem.certs", "server-ca.crt");
 
     @Override
     public RestService getApp() {

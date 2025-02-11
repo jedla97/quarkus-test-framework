@@ -24,7 +24,7 @@ import io.smallrye.certs.CertificateFiles;
 import io.smallrye.certs.CertificateGenerator;
 import io.smallrye.certs.CertificateRequest;
 import io.smallrye.certs.Format;
-import io.smallrye.certs.Pkcs12CertificateFiles;
+import io.smallrye.certs.JksCertificateFiles;
 
 public class KeycloakService extends BaseService<KeycloakService> {
 
@@ -66,14 +66,17 @@ public class KeycloakService extends BaseService<KeycloakService> {
                         .withName(KEYSTORE_PREFIX)
                         .withPassword(KEYSTORE_PASSWORD)
                         .withFormat(KEYSTORE_FORMAT);
-                List<CertificateFiles> certificateFiles = new CertificateGenerator(Path.of("target", "test-classes"), true)
+                List<CertificateFiles> certificateFiles = new CertificateGenerator(Path.of("target", "test-classes"),
+                        true)
                         .generate(request);
-                keystoreName = ((Pkcs12CertificateFiles) certificateFiles.get(0)).keyStoreFile().getFileName().toString();
+                keystoreName = ((JksCertificateFiles) certificateFiles.get(0)).keyStoreFile().getFileName().toString();
 
             } catch (Exception e) {
                 throw new IllegalStateException(e);
             }
-            withProperty("KC_HTTPS_KEY_STORE_FILE", "secret_with_destination::" + KEYSTORE_DEST_PATH + "|" + keystoreName);
+            withProperty("KC_HTTPS_CERTIFICATE_FILE", "secret_with_destination::" + KEYSTORE_DEST_PATH + "|" + keystoreName);
+            withProperty("KC_HTTPS_CERTIFICATE_KEY_FILE", "secret_with_destination::" + KEYSTORE_DEST_PATH + "|"
+                    + keystoreName);
             withProperty("KC_HTTPS_KEY_STORE_PASSWORD", KEYSTORE_PASSWORD);
         }
     }
@@ -120,19 +123,24 @@ public class KeycloakService extends BaseService<KeycloakService> {
         }
     }
 
-    public AuthzClient createAuthzClient(String clientId, String clientSecret)
-            throws NoSuchAlgorithmException, KeyStoreException, KeyManagementException {
-        TrustStrategy acceptingTrustStrategy = (cert, authType) -> true;
-        SSLContext sslContext = SSLContexts.custom()
-                .loadTrustMaterial(null, acceptingTrustStrategy)
-                .build();
-        SSLConnectionSocketFactory sslsf = new SSLConnectionSocketFactory(sslContext, NoopHostnameVerifier.INSTANCE);
+    public AuthzClient createAuthzClient(String clientId, String clientSecret) {
+        SSLConnectionSocketFactory sslConnectionSocketFactory;
+        try {
+            TrustStrategy acceptingTrustStrategy = (cert, authType) -> true;
+            SSLContext sslContext = SSLContexts.custom()
+                    .loadTrustMaterial(null, acceptingTrustStrategy)
+                    .build();
+            sslConnectionSocketFactory = new SSLConnectionSocketFactory(sslContext, NoopHostnameVerifier.INSTANCE);
+        } catch (NoSuchAlgorithmException | KeyStoreException | KeyManagementException e) {
+            throw new IllegalStateException("Unable to create SSLConnectionSocketFactory to allow"
+                    + " secured connection use self-signed certificates", e);
+        }
         return AuthzClient.create(new Configuration(
                 StringUtils.substringBefore(getRealmUrl(), "/realms"),
                 realm,
                 clientId,
                 Collections.singletonMap("secret", clientSecret),
-                HttpClients.custom().setSSLSocketFactory(sslsf).build()));
+                HttpClients.custom().setSSLSocketFactory(sslConnectionSocketFactory).build()));
     }
 
     private String normalizeRealmBasePath(String realmBasePath) {

@@ -301,8 +301,13 @@ public final class OpenShiftClient {
         }
 
         try {
-            new Command(OC, "expose", "svc/" + serviceName, "--port=" + port, "-n", currentNamespace,
-                    "-l" + LABEL_SCENARIO_ID + "=" + getScenarioId()).runAndWait();
+            if (serviceName.contains("keycloak")) {
+                new Command(OC, "create", "route", "passthrough", "--service", serviceName, "--port=" + port, "-n",
+                        currentNamespace).runAndWait();
+            } else {
+                new Command(OC, "expose", "svc/" + serviceName, "--port=" + port, "-n", currentNamespace,
+                        "-l" + LABEL_SCENARIO_ID + "=" + getScenarioId()).runAndWait();
+            }
         } catch (Exception e) {
             fail("Service failed to be exposed. Caused by " + e.getMessage());
         }
