@@ -37,7 +37,7 @@ public class KeycloakService extends BaseService<KeycloakService> {
     private static final String USER = "admin";
     private static final String PASSWORD = "admin";
     private static final String KEYSTORE_PREFIX = "server";
-    private static final Format KEYSTORE_FORMAT = Format.PKCS12;
+    private static final Format KEYSTORE_FORMAT = Format.JKS;
     private static final String KEYSTORE_PASSWORD = "secret";
     private static final int HTTP_80 = 80;
 
@@ -74,9 +74,7 @@ public class KeycloakService extends BaseService<KeycloakService> {
             } catch (Exception e) {
                 throw new IllegalStateException(e);
             }
-            withProperty("KC_HTTPS_CERTIFICATE_FILE", "secret_with_destination::" + KEYSTORE_DEST_PATH + "|" + keystoreName);
-            withProperty("KC_HTTPS_CERTIFICATE_KEY_FILE", "secret_with_destination::" + KEYSTORE_DEST_PATH + "|"
-                    + keystoreName);
+            withProperty("KC_HTTPS_KEY_STORE_FILE", "secret_with_destination::" + KEYSTORE_DEST_PATH + "|" + keystoreName);
             withProperty("KC_HTTPS_KEY_STORE_PASSWORD", KEYSTORE_PASSWORD);
         }
     }

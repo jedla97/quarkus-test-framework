@@ -50,6 +50,7 @@ public class KeycloakGenericDockerContainerManagedResource extends GenericDocker
         }
 
         container.withExposedPorts(model.getPort());
+        container.withExposedPorts(model.getSecuredPort());
 
         return container;
     }

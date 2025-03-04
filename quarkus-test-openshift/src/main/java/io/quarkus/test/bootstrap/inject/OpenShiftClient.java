@@ -301,13 +301,8 @@ public final class OpenShiftClient {
         }
 
         try {
-            if (serviceName.contains("keycloak")) {
-                new Command(OC, "create", "route", "passthrough", "--service", serviceName, "--port=" + port, "-n",
-                        currentNamespace).runAndWait();
-            } else {
-                new Command(OC, "expose", "svc/" + serviceName, "--port=" + port, "-n", currentNamespace,
-                        "-l" + LABEL_SCENARIO_ID + "=" + getScenarioId()).runAndWait();
-            }
+            new Command(OC, "expose", "svc/" + serviceName, "--port=" + port, "-n", currentNamespace,
+                    "-l" + LABEL_SCENARIO_ID + "=" + getScenarioId()).runAndWait();
         } catch (Exception e) {
             fail("Service failed to be exposed. Caused by " + e.getMessage());
         }
@@ -333,6 +328,37 @@ public final class OpenShiftClient {
                     "--name=" + routeName,
                     "-n", currentNamespace,
                     "-l" + LABEL_SCENARIO_ID + "=" + getScenarioId()).runAndWait();
+        } catch (Exception e) {
+            fail("Service failed to be exposed. Caused by " + e.getMessage());
+        }
+    }
+
+    /**
+     * Expose the service and port using route passthrough.
+     *
+     * @param service
+     * @param port
+     */
+    public void exposeThroughPassthrough(Service service, int port) {
+        exposeThroughPassthrough(service.getName(), port);
+    }
+
+    /**
+     * Expose the service and port using route passthrough.
+     *
+     * @param serviceName
+     * @param port
+     */
+    public void exposeThroughPassthrough(String serviceName, int port) {
+        Route route = client.routes().withName(serviceName).get();
+        if (route != null) {
+            // already exposed.
+            return;
+        }
+
+        try {
+            new Command(OC, "create", "route", "passthrough", "--service", serviceName, "--port=" + port, "-n",
+                    currentNamespace).runAndWait();
         } catch (Exception e) {
             fail("Service failed to be exposed. Caused by " + e.getMessage());
         }

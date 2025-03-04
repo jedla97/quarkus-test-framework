@@ -97,7 +97,8 @@ public class OpenShiftContainerManagedResource implements ManagedResource {
 
     protected void exposeService() {
         if (!useInternalServiceAsUrl()) {
-            client.expose(model.getContext().getOwner(), model.getPort());
+            client.exposeThroughPassthrough(model.getContext().getOwner(), model.getSecuredPort());
+            client.expose(model.getContext().getOwner().getName() + "-secured", model.getPort());
         }
     }
 
@@ -133,6 +134,8 @@ public class OpenShiftContainerManagedResource implements ManagedResource {
                 .replaceAll(quote("${SERVICE_NAME}"), model.getContext().getName())
                 .replaceAll(quote("${INTERNAL_PORT}"), "" + model.getPort())
                 .replaceAll(quote("${INTERNAL_INGRESS_PORT}"), "" + model.getPort())
+                .replaceAll(quote("${INTERNAL_SECURED_PORT}"), "" + model.getSecuredPort())
+                .replaceAll(quote("${INTERNAL_SECURED_INGRESS_PORT}"), "" + model.getSecuredPort())
                 .replaceAll(quote("${ARGS}"), args)
                 .replaceAll(quote("${CURRENT_NAMESPACE}"), client.project());
     }
