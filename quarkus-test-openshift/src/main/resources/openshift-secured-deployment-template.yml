@@ -8,9 +8,21 @@ items:
     name: "${SERVICE_NAME}"
   spec:
     ports:
-    - name: "http"
+    - name: "https"
       port: ${INTERNAL_INGRESS_PORT}
       targetPort: ${INTERNAL_PORT}
+    selector:
+      deployment: "${SERVICE_NAME}"
+    type: "ClusterIP"
+- apiVersion: "v1"
+  kind: "Service"
+  metadata:
+    name: "${SERVICE_NAME}-secured"
+  spec:
+    ports:
+      - name: "https"
+        port: ${INTERNAL_SECURED_INGRESS_PORT}
+        targetPort: ${INTERNAL_SECURED_PORT}
     selector:
       deployment: "${SERVICE_NAME}"
     type: "ClusterIP"
@@ -35,7 +47,7 @@ items:
           name: "${SERVICE_NAME}"
           ports:
           - containerPort: ${INTERNAL_PORT}
-            name: "http"
+            name: "https"
             protocol: "TCP"
     triggers:
     - type: "ConfigChange"

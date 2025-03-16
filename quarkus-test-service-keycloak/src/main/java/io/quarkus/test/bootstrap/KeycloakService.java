@@ -1,5 +1,8 @@
 package io.quarkus.test.bootstrap;
 
+import static io.quarkus.test.configuration.Configuration.Property.OCP_SUBJECT_ALTERNATIVE_NAME;
+
+import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.file.Path;
@@ -20,16 +23,20 @@ import org.apache.http.ssl.TrustStrategy;
 import org.keycloak.authorization.client.AuthzClient;
 import org.keycloak.authorization.client.Configuration;
 
+import io.quarkus.test.configuration.PropertyLookup;
 import io.smallrye.certs.CertificateFiles;
 import io.smallrye.certs.CertificateGenerator;
 import io.smallrye.certs.CertificateRequest;
 import io.smallrye.certs.Format;
 import io.smallrye.certs.JksCertificateFiles;
+import io.smallrye.certs.PemCertificateFiles;
+import io.smallrye.certs.Pkcs12CertificateFiles;
 
 public class KeycloakService extends BaseService<KeycloakService> {
 
     public static final String DEFAULT_REALM_BASE_PATH = "/realms";
     public static final String DEFAULT_REALM = "test-realm";
+    public static final String KEYSTORE_PASSWORD = "secret";
     // The convention for importing realm is to have file name like `<realm-name>-realm.json`
     public static final String DEFAULT_REALM_FILE = "/test-realm-realm.json";
     private static final String REALM_DEST_PATH = "/opt/keycloak/data/import";
@@ -37,12 +44,12 @@ public class KeycloakService extends BaseService<KeycloakService> {
     private static final String USER = "admin";
     private static final String PASSWORD = "admin";
     private static final String KEYSTORE_PREFIX = "server";
-    private static final Format KEYSTORE_FORMAT = Format.JKS;
-    private static final String KEYSTORE_PASSWORD = "secret";
+    private static final Format DEFAULT_KEYSTORE_FORMAT = Format.JKS;
     private static final int HTTP_80 = 80;
 
     private String realmBasePath = "realms";
     private final String realm;
+    private String trustStoreName;
 
     private boolean runKeycloakInProdMode = false;
 
@@ -52,31 +59,30 @@ public class KeycloakService extends BaseService<KeycloakService> {
      * @param realmFile for example /test-realm-realm.json
      * @param realmName
      * @param realmBasePath such as "/realms" used by Keycloak 18 or "auth/realms" used by previous versions
-     * @param runKeycloakInProdMode the prod mode needs to setup certificate and use https protocol
+     * @param runKeycloakInProdMode the prod mode needs to set up certificate and use https protocol
+     * @param keystoreFormat the format which should be used to enable TLS on Keycloak
      */
-    public KeycloakService(String realmFile, String realmName, String realmBasePath, boolean runKeycloakInProdMode) {
+    public KeycloakService(String realmFile, String realmName, String realmBasePath, boolean runKeycloakInProdMode,
+            Format keystoreFormat) {
         this(realmName);
         this.realmBasePath = normalizeRealmBasePath(realmBasePath);
         this.runKeycloakInProdMode = runKeycloakInProdMode;
         withProperty("KEYCLOAK_REALM_IMPORT", "resource_with_destination::" + REALM_DEST_PATH + "|" + realmFile);
         if (runKeycloakInProdMode) {
-            String keystoreName;
-            try {
-                CertificateRequest request = new CertificateRequest()
-                        .withName(KEYSTORE_PREFIX)
-                        .withPassword(KEYSTORE_PASSWORD)
-                        .withFormat(KEYSTORE_FORMAT);
-                List<CertificateFiles> certificateFiles = new CertificateGenerator(Path.of("target", "test-classes"),
-                        true)
-                        .generate(request);
-                keystoreName = ((JksCertificateFiles) certificateFiles.get(0)).keyStoreFile().getFileName().toString();
-
-            } catch (Exception e) {
-                throw new IllegalStateException(e);
-            }
-            withProperty("KC_HTTPS_KEY_STORE_FILE", "secret_with_destination::" + KEYSTORE_DEST_PATH + "|" + keystoreName);
-            withProperty("KC_HTTPS_KEY_STORE_PASSWORD", KEYSTORE_PASSWORD);
+            prepareKeycloakToStartInProdMode(keystoreFormat);
         }
+    }
+
+    /**
+     * KeycloakService constructor, supported since Keycloak 18.
+     *
+     * @param realmFile for example /test-realm-realm.json
+     * @param realmName
+     * @param realmBasePath such as "/realms" used by Keycloak 18 or "auth/realms" used by previous versions
+     * @param runKeycloakInProdMode the prod mode needs to set up certificate and use https protocol
+     */
+    public KeycloakService(String realmFile, String realmName, String realmBasePath, boolean runKeycloakInProdMode) {
+        this(realmFile, realmName, realmBasePath, runKeycloakInProdMode, DEFAULT_KEYSTORE_FORMAT);
     }
 
     /**
@@ -151,5 +157,62 @@ public class KeycloakService extends BaseService<KeycloakService> {
         }
 
         return realmBasePath;
+    }
+
+    private void prepareKeycloakToStartInProdMode(Format keystoreFormat) {
+        try {
+            String subjectAlternativeName = new PropertyLookup(OCP_SUBJECT_ALTERNATIVE_NAME.getName(), "localhost").get();
+            CertificateRequest request = new CertificateRequest()
+                    .withName(KEYSTORE_PREFIX)
+                    .withPassword(KEYSTORE_PASSWORD)
+                    .withSubjectAlternativeName(subjectAlternativeName)
+                    .withFormat(keystoreFormat);
+            List<CertificateFiles> certificateFiles = new CertificateGenerator(Path.of("target"),
+                    true)
+                    .generate(request);
+            setPathsAndPropertiesForDifferentFormats(certificateFiles, keystoreFormat);
+        } catch (Exception e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    private void setPathsAndPropertiesForDifferentFormats(List<CertificateFiles> certificateFiles, Format keystoreFormat)
+            throws IOException {
+        if (keystoreFormat.equals(Format.PKCS12)) {
+            String keystoreName = ((Pkcs12CertificateFiles) certificateFiles.get(0)).keyStoreFile().getFileName().toString();
+            prepareTruststore(((Pkcs12CertificateFiles) certificateFiles.get(0)).trustStoreFile().toAbsolutePath());
+
+            withProperty("KC_HTTPS_KEY_STORE_FILE", "secret_with_destination::" + KEYSTORE_DEST_PATH + "|" + keystoreName);
+            withProperty("KC_HTTPS_KEY_STORE_PASSWORD", KEYSTORE_PASSWORD);
+        } else if (keystoreFormat.equals(Format.JKS)) {
+            String keystoreName = ((JksCertificateFiles) certificateFiles.get(0)).keyStoreFile().getFileName().toString();
+            prepareTruststore(((JksCertificateFiles) certificateFiles.get(0)).trustStoreFile().toAbsolutePath());
+
+            withProperty("KC_HTTPS_KEY_STORE_FILE", "secret_with_destination::" + KEYSTORE_DEST_PATH + "|" + keystoreName);
+            withProperty("KC_HTTPS_KEY_STORE_PASSWORD", KEYSTORE_PASSWORD);
+        } else if (keystoreFormat.equals(Format.PEM)) {
+            String certFile = ((PemCertificateFiles) certificateFiles.get(0)).certFile().getFileName().toString();
+            String certKeyFile = ((PemCertificateFiles) certificateFiles.get(0)).keyFile().getFileName().toString();
+
+            prepareTruststore(((PemCertificateFiles) certificateFiles.get(0)).trustFile().toAbsolutePath());
+
+            withProperty("KC_HTTPS_CERTIFICATE_FILE", "secret_with_destination::" + KEYSTORE_DEST_PATH + "|" + certFile);
+            withProperty("KC_HTTPS_CERTIFICATE_KEY_FILE", "secret_with_destination::" + KEYSTORE_DEST_PATH + "|"
+                    + certKeyFile);
+        } else {
+            throw new IllegalArgumentException("Unsupported keystore format.");
+        }
+    }
+
+    private void prepareTruststore(Path trustStorePath) throws IOException {
+        trustStoreName = trustStorePath.getFileName().toString();
+        //Files.copy(trustStorePath, Path.of("src", "test", "resources", trustStoreName).toAbsolutePath(),
+        //        StandardCopyOption.REPLACE_EXISTING);
+        //withProperty("GENERATED_TRUSTSTORE", "secret::/" + trustStoreName);
+        //trustStoreName = trustStorePath.toAbsolutePath().toString();
+    }
+
+    public String getTrustStoreName() {
+        return trustStoreName;
     }
 }
