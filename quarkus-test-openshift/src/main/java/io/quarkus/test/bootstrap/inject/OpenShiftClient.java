@@ -38,6 +38,7 @@ import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.TimeUnit;
 import java.util.function.UnaryOperator;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -354,7 +355,7 @@ public final class OpenShiftClient {
      * Changes the deployment spec to make the specific port exposed.
      */
     public void exposeDeploymentPort(String deploymentName, String portName, int port) {
-        Deployment deployment = client.apps().deployments().withName(deploymentName).get();
+        Deployment deployment = client.apps().deployments().withName(deploymentName).waitUntilReady(1, TimeUnit.SECONDS);
         DeploymentStatus dep = deployment.getStatus();
 
         deployment.getSpec().getTemplate().getSpec().getContainers().get(0).getPorts().add(
