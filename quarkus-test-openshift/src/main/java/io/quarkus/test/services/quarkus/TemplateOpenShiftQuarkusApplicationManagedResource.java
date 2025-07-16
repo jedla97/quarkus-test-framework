@@ -91,12 +91,14 @@ public abstract class TemplateOpenShiftQuarkusApplicationManagedResource<T exten
             // properties are set to context by OpenShiftQuarkusApplicationCertificateConfigurator
             if (model.getContext().get(CertificateBuilder.INSTANCE_KEY) != null) {
                 String appName = model.getContext().getName();
+                client.scaleTo(model.getContext().getOwner(), 0);
                 client.mountSecretToDeployment(appName, model.getContext().get(PROPERTY_KEYSTORE_SECRET_NAME),
                         KEYSTORE_MOUNT_PATH);
+                client.scaleTo(model.getContext().getOwner(), 0);
                 client.mountSecretToDeployment(appName, model.getContext().get(PROPERTY_TRUSTSTORE_SECRET_NAME),
                         TRUSTSTORE_MOUNT_PATH);
             }
-            client.scaleTo(model.getContext().getOwner(), 0);
+            client.scaleTo(model.getContext().getOwner(), 1);
         }
     }
 
