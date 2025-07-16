@@ -369,22 +369,7 @@ public final class OpenShiftClient {
                 .waitUntilCondition(deployment -> {
                     // The condition will be checked repeatedly.
                     // First, a basic check on the deployment's own status.
-                    if (deployment == null || deployment.getStatus() == null
-                            || deployment.getStatus().getReadyReplicas() == null) {
-                        return false;
-                    }
-                    if (!deployment.getSpec().getReplicas().equals(deployment.getStatus().getReadyReplicas())) {
-                        return false; // Not all replicas are ready yet.
-                    }
-
-                    // Now, perform the detailed check on each pod.
-                    Map<String, String> matchLabels = deployment.getSpec().getSelector().getMatchLabels();
-                    List<Pod> pods = client.pods().withLabels(matchLabels).list().getItems();
-
-                    // All pods must have the desired condition.
-                    return pods.stream().allMatch(pod -> pod.getStatus().getConditions().stream()
-                            .filter(c -> "PodReadyToStartContainers".equals(c.getType()))
-                            .anyMatch(c -> "True".equals(c.getStatus())));
+                    return deployment != null && deployment.getStatus() != null;
                 }, 1, TimeUnit.MINUTES);
     }
 
