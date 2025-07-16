@@ -65,6 +65,7 @@ import io.fabric8.kubernetes.api.model.VolumeBuilder;
 import io.fabric8.kubernetes.api.model.VolumeMount;
 import io.fabric8.kubernetes.api.model.VolumeMountBuilder;
 import io.fabric8.kubernetes.api.model.apps.Deployment;
+import io.fabric8.kubernetes.api.model.apps.DeploymentStatus;
 import io.fabric8.kubernetes.client.CustomResource;
 import io.fabric8.kubernetes.client.KubernetesClientBuilder;
 import io.fabric8.kubernetes.client.dsl.NamespaceListVisitFromServerGetDeleteRecreateWaitApplicable;
@@ -354,6 +355,7 @@ public final class OpenShiftClient {
      */
     public void exposeDeploymentPort(String deploymentName, String portName, int port) {
         Deployment deployment = client.apps().deployments().withName(deploymentName).get();
+        DeploymentStatus dep = deployment.getStatus();
 
         deployment.getSpec().getTemplate().getSpec().getContainers().get(0).getPorts().add(
                 new ContainerPort(port, "", 0, portName, "TCP"));
