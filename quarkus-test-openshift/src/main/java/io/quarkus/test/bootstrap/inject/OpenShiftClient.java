@@ -357,7 +357,8 @@ public final class OpenShiftClient {
     public void exposeDeploymentPort(String deploymentName, String portName, int port) {
         Deployment deployment = null;
         try {
-            deployment = client.apps().deployments().withName(deploymentName).waitUntilReady(1, TimeUnit.SECONDS);
+            deployment = client.apps().deployments().withName(deploymentName).waitUntilReady(PROJECT_NAME_SIZE,
+                    TimeUnit.SECONDS);
         } catch (Exception e) {
             System.err.println("Error waiting for deployment: " + e.getMessage());
         }
