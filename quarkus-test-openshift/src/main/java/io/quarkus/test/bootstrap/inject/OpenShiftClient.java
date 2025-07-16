@@ -127,7 +127,7 @@ public final class OpenShiftClient {
     private final KnativeClient kn;
     private final String scenarioId;
     private boolean isClientReady;
-    private int lastNumberOfReplicas = 0;
+    private long lastObservedGeneration = 0;
 
     private OpenShiftClient(String scenarioId) {
         this.scenarioId = scenarioId;
@@ -368,17 +368,18 @@ public final class OpenShiftClient {
         Deployment initializedDeployment = client.apps().deployments().withName(deploymentName)
                 .waitUntilCondition(deployment -> {
                     if (deployment == null || deployment.getStatus() == null
-                            || deployment.getStatus().getReplicas() == null) {
+                            || deployment.getStatus().getReplicas() == null
+                            || deployment.getStatus().getObservedGeneration() == null) {
                         return false;
                     }
 
-                    return deployment.getStatus().getReplicas() > lastNumberOfReplicas;
+                    return deployment.getStatus().getObservedGeneration() > lastObservedGeneration;
                 }, 1, TimeUnit.MINUTES);
         if (initializedDeployment == null) {
             fail("Fetch of deployment failed");
         }
 
-        lastNumberOfReplicas = initializedDeployment.getStatus().getReplicas();
+        lastObservedGeneration = initializedDeployment.getStatus().getObservedGeneration();
         return initializedDeployment;
     }
 
