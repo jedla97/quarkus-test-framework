@@ -127,7 +127,7 @@ public final class OpenShiftClient {
     private final KnativeClient kn;
     private final String scenarioId;
     private boolean isClientReady;
-    private long lastObservedGeneration;
+    private long lastObservedGeneration = 0;
 
     private OpenShiftClient(String scenarioId) {
         this.scenarioId = scenarioId;
@@ -377,6 +377,8 @@ public final class OpenShiftClient {
         if (initializedDeployment == null) {
             fail("Fetch of deployment failed");
         }
+
+        lastObservedGeneration = initializedDeployment.getStatus().getObservedGeneration();
         return initializedDeployment;
     }
 
