@@ -79,7 +79,8 @@ public abstract class TemplateOpenShiftQuarkusApplicationManagedResource<T exten
                 model.getContext().getServiceFolder().resolve(DEPLOYMENT));
 
         if (model.isSslEnabled()) {
-            client.exposeDeploymentPortWithRetry(model.getContext().getName(), "https", model.getOcpTlsPort());
+            client.scaleTo(model.getContext().getOwner(), 0);
+            client.exposeDeploymentPort(model.getContext().getName(), "https", model.getOcpTlsPort());
             client.createService(model.getContext().getName(),
                     model.getContext().getName() + TLS_ROUTE_SUFFIX, model.getOcpTlsPort());
             client.createTlsPassthroughRoute(model.getContext().getName() + TLS_ROUTE_SUFFIX,

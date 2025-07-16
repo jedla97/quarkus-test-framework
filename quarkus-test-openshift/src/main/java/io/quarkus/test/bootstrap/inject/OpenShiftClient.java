@@ -364,29 +364,6 @@ public final class OpenShiftClient {
         client.apps().deployments().withName(deploymentName).patch(deployment);
     }
 
-    public void exposeDeploymentPortWithRetry(String deploymentName, String portName, int port) {
-        // Use the client's built-in retry mechanism for conflicts
-        final Resource<Deployment> deploymentResource = client.apps().deployments().withName(deploymentName);
-
-        deploymentResource.edit(d -> {
-            // 'd' is the latest version of the Deployment object.
-            // The client handles fetching it and retrying on conflict.
-
-            // Add the new port to the first container
-            d.getSpec().getTemplate().getSpec().getContainers().get(0).getPorts().add(
-                    new ContainerPort(port, null, null, portName, "TCP"));
-
-            Log.info("Attempting to expose port %d on deployment %s", port, deploymentName);
-
-            // The modified object 'd' is returned and the client will attempt to update it.
-            // If a 409 Conflict occurs, the client will re-fetch the deployment
-            // and re-apply this lambda function.
-            return d;
-        });
-
-        Log.info("Successfully exposed port %d with name %s on deployment %s", port, portName, deploymentName);
-    }
-
     /**
      * Expose specific port on a service.
      *
