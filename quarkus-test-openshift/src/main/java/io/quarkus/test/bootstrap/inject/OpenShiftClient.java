@@ -373,7 +373,7 @@ public final class OpenShiftClient {
                         return false;
                     }
 
-                    return deployment.getStatus().getObservedGeneration() > lastObservedGeneration;
+                    return deployment.getStatus().getObservedGeneration() >= deployment.getMetadata().getGeneration();
                 }, 1, TimeUnit.MINUTES);
         if (initializedDeployment == null) {
             fail("Fetch of deployment failed");
