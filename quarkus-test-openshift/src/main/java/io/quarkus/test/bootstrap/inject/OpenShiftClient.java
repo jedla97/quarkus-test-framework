@@ -355,13 +355,15 @@ public final class OpenShiftClient {
      * Changes the deployment spec to make the specific port exposed.
      */
     public void exposeDeploymentPort(String deploymentName, String portName, int port) {
-        Deployment deployment = null;
-        try {
-            deployment = client.apps().deployments().withName(deploymentName).waitUntilReady(2,
-                    TimeUnit.SECONDS);
-        } catch (Exception e) {
-            System.err.println("Error waiting for deployment: " + e.getMessage());
+        Deployment appliedDeployment = client.apps().deployments()
+                .withName(deploymentName)
+                .waitUntilReady(1, TimeUnit.MINUTES);
+
+        if (appliedDeployment == null) {
+            Log.info("Timeout: Initial deployment '%s' never became ready.%n", deploymentName);
         }
+
+        Deployment deployment = client.apps().deployments().withName(deploymentName).get();
         DeploymentStatus dep = deployment.getStatus();
 
         deployment.getSpec().getTemplate().getSpec().getContainers().get(0).getPorts().add(
