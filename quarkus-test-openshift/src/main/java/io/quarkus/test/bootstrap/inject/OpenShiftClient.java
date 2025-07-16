@@ -53,6 +53,7 @@ import io.fabric8.knative.client.KnativeClient;
 import io.fabric8.kubernetes.api.model.ConfigMapBuilder;
 import io.fabric8.kubernetes.api.model.ConfigMapVolumeSourceBuilder;
 import io.fabric8.kubernetes.api.model.Container;
+import io.fabric8.kubernetes.api.model.ContainerPort;
 import io.fabric8.kubernetes.api.model.EnvVar;
 import io.fabric8.kubernetes.api.model.HasMetadata;
 import io.fabric8.kubernetes.api.model.IntOrString;
@@ -65,7 +66,6 @@ import io.fabric8.kubernetes.api.model.VolumeBuilder;
 import io.fabric8.kubernetes.api.model.VolumeMount;
 import io.fabric8.kubernetes.api.model.VolumeMountBuilder;
 import io.fabric8.kubernetes.api.model.apps.Deployment;
-import io.fabric8.kubernetes.api.model.apps.DeploymentBuilder;
 import io.fabric8.kubernetes.client.CustomResource;
 import io.fabric8.kubernetes.client.KubernetesClientBuilder;
 import io.fabric8.kubernetes.client.dsl.NamespaceListVisitFromServerGetDeleteRecreateWaitApplicable;
@@ -354,32 +354,38 @@ public final class OpenShiftClient {
      * Changes the deployment spec to make the specific port exposed.
      */
     public void exposeDeploymentPort(String deploymentName, String portName, int port) {
-        //Deployment deployment = client.apps().deployments().withName(deploymentName).get();
-        Deployment updatedDeployment = client.apps().deployments()
-                .withName(deploymentName)
-                .edit(d -> new DeploymentBuilder(d)
-                        .editSpec()
-                        .editTemplate()
-                        .editSpec()
-                        // Edit the container at the specified index
-                        .editContainer(0)
-                        // Add a new port using the builder
-                        .addNewPort()
-                        .withName(portName)
-                        .withContainerPort(port)
-                        .withProtocol("TCP")
-                        .endPort() // Finish editing the port
-                        .endContainer() // Finish editing the container
-                        .endSpec()
-                        .endTemplate()
-                        .endSpec()
-                        .build());
+        waitForDeploymentInitialize(deploymentName);
+        Deployment deployment = client.apps().deployments().withName(deploymentName).get();
 
-        //deployment.getSpec().getTemplate().getSpec().getContainers().get(0).getPorts().add(
-        //        new ContainerPort(port, "", 0, portName, "TCP"));
+        deployment.getSpec().getTemplate().getSpec().getContainers().get(0).getPorts().add(
+                new ContainerPort(port, "", 0, portName, "TCP"));
 
-        //Log.info("Exposing port %d with name %s on deployment %s", port, portName, deploymentName);
-        //client.resource(deployment).serverSideApply();
+        Log.info("Exposing port %d with name %s on deployment %s", port, portName, deploymentName);
+        client.resource(deployment).serverSideApply();
+    }
+
+    public void waitForDeploymentInitialize(String deploymentName) {
+        client.apps().deployments().withName(deploymentName)
+                .waitUntilCondition(deployment -> {
+                    // The condition will be checked repeatedly.
+                    // First, a basic check on the deployment's own status.
+                    if (deployment == null || deployment.getStatus() == null
+                            || deployment.getStatus().getReadyReplicas() == null) {
+                        return false;
+                    }
+                    if (!deployment.getSpec().getReplicas().equals(deployment.getStatus().getReadyReplicas())) {
+                        return false; // Not all replicas are ready yet.
+                    }
+
+                    // Now, perform the detailed check on each pod.
+                    Map<String, String> matchLabels = deployment.getSpec().getSelector().getMatchLabels();
+                    List<Pod> pods = client.pods().withLabels(matchLabels).list().getItems();
+
+                    // All pods must have the desired condition.
+                    return pods.stream().allMatch(pod -> pod.getStatus().getConditions().stream()
+                            .filter(c -> "PodReadyToStartContainers".equals(c.getType()))
+                            .anyMatch(c -> "True".equals(c.getStatus())));
+                }, 1, TimeUnit.MINUTES);
     }
 
     /**

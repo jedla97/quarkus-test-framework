@@ -97,7 +97,6 @@ public abstract class TemplateOpenShiftQuarkusApplicationManagedResource<T exten
                 client.mountSecretToDeployment(appName, model.getContext().get(PROPERTY_TRUSTSTORE_SECRET_NAME),
                         TRUSTSTORE_MOUNT_PATH);
             }
-            client.scaleTo(model.getContext().getOwner(), 1);
         }
     }
 
