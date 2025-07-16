@@ -824,6 +824,14 @@ public final class OpenShiftClient {
     }
 
     public void mountSecretToDeployment(String deploymentName, String secretName, String mountPath) {
+        Deployment appliedDeployment = client.apps().deployments()
+                .withName(deploymentName)
+                .waitUntilReady(1, TimeUnit.MINUTES);
+
+        if (appliedDeployment == null) {
+            Log.info("Timeout: Initial deployment '%s' never became ready.%n", deploymentName);
+        }
+
         Deployment deployment = client.apps().deployments().withName(deploymentName).get();
 
         SecretVolumeSource secretVolumeSource = new SecretVolumeSource();
