@@ -354,8 +354,7 @@ public final class OpenShiftClient {
      * Changes the deployment spec to make the specific port exposed.
      */
     public void exposeDeploymentPort(String deploymentName, String portName, int port) {
-        waitForDeploymentInitialize(deploymentName);
-        Deployment deployment = client.apps().deployments().withName(deploymentName).get();
+        Deployment deployment = getInitializedDeploymentAfterCreationAndPatch(deploymentName);
 
         deployment.getSpec().getTemplate().getSpec().getContainers().get(0).getPorts().add(
                 new ContainerPort(port, "", 0, portName, "TCP"));
@@ -364,13 +363,17 @@ public final class OpenShiftClient {
         client.apps().deployments().withName(deploymentName).patch(deployment);
     }
 
-    public void waitForDeploymentInitialize(String deploymentName) {
-        client.apps().deployments().withName(deploymentName)
+    public Deployment getInitializedDeploymentAfterCreationAndPatch(String deploymentName) {
+        Deployment initializedDeployment = client.apps().deployments().withName(deploymentName)
                 .waitUntilCondition(deployment -> {
                     // The condition will be checked repeatedly.
                     // First, a basic check on the deployment's own status.
                     return deployment != null && deployment.getStatus() != null && deployment.getStatus().getReplicas() != null;
                 }, 1, TimeUnit.MINUTES);
+        if (initializedDeployment == null) {
+            fail("Fetch of deployment failed");
+        }
+        return initializedDeployment;
     }
 
     /**
@@ -824,15 +827,7 @@ public final class OpenShiftClient {
     }
 
     public void mountSecretToDeployment(String deploymentName, String secretName, String mountPath) {
-        Deployment appliedDeployment = client.apps().deployments()
-                .withName(deploymentName)
-                .waitUntilReady(1, TimeUnit.MINUTES);
-
-        if (appliedDeployment == null) {
-            Log.info("Timeout: Initial deployment '%s' never became ready.%n", deploymentName);
-        }
-
-        Deployment deployment = client.apps().deployments().withName(deploymentName).get();
+        Deployment deployment = getInitializedDeploymentAfterCreationAndPatch(deploymentName);
 
         SecretVolumeSource secretVolumeSource = new SecretVolumeSource();
         secretVolumeSource.setSecretName(secretName);
