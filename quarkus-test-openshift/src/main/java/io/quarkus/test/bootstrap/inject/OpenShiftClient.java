@@ -368,7 +368,7 @@ public final class OpenShiftClient {
         Deployment initializedDeployment = client.apps().deployments().withName(deploymentName)
                 .waitUntilCondition(deployment -> {
                     if (deployment == null || deployment.getStatus() == null
-                            || deployment.getStatus().getReplicas() == null
+                            || deployment.getStatus().getUpdatedReplicas() == null
                             || deployment.getStatus().getObservedGeneration() == null) {
                         return false;
                     }
