@@ -369,7 +369,7 @@ public final class OpenShiftClient {
                 .waitUntilCondition(deployment -> {
                     // The condition will be checked repeatedly.
                     // First, a basic check on the deployment's own status.
-                    return deployment != null && deployment.getStatus() != null;
+                    return deployment != null && deployment.getStatus() != null && deployment.getStatus().getReplicas() != null;
                 }, 1, TimeUnit.MINUTES);
     }
 
