@@ -355,9 +355,7 @@ public final class OpenShiftClient {
      * Changes the deployment spec to make the specific port exposed.
      */
     public void exposeDeploymentPort(String deploymentName, String portName, int port) {
-        Deployment deployment = client.apps().deployments()
-                .withName(deploymentName)
-                .waitUntilReady(1, TimeUnit.MINUTES);
+        Deployment deployment = getInitializedDeploymentAfterCreationAndPatch(deploymentName);
 
         deployment.getSpec().getTemplate().getSpec().getContainers().get(0).getPorts().add(
                 new ContainerPort(port, "", 0, portName, "TCP"));
