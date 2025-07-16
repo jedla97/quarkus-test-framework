@@ -361,7 +361,7 @@ public final class OpenShiftClient {
                 new ContainerPort(port, "", 0, portName, "TCP"));
 
         Log.info("Exposing port %d with name %s on deployment %s", port, portName, deploymentName);
-        client.resource(deployment).serverSideApply();
+        client.apps().deployments().withName(deploymentName).patch(deployment);
     }
 
     public void waitForDeploymentInitialize(String deploymentName) {
