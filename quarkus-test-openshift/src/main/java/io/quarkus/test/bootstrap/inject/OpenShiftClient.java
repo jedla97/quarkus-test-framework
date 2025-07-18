@@ -371,6 +371,7 @@ public final class OpenShiftClient {
                             || deployment.getStatus().getObservedGeneration() == null) {
                         return false;
                     }
+                    Log.info("JEDLA version = " + deployment.getMetadata().getResourceVersion());
 
                     return deployment.getStatus().getObservedGeneration() >= deployment.getMetadata().getGeneration();
                 }, 1, TimeUnit.MINUTES);
