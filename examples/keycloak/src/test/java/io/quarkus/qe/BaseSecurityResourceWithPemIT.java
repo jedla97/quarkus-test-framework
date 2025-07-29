@@ -11,15 +11,16 @@ import org.keycloak.authorization.client.AuthzClient;
 
 import io.quarkus.test.bootstrap.KeycloakService;
 import io.quarkus.test.bootstrap.RestService;
+import io.quarkus.test.services.Certificate;
 import io.quarkus.test.services.KeycloakContainer;
 
-public abstract class BaseSecurityResourceIT {
+public abstract class BaseSecurityResourceWithPemIT {
 
     static final String CLIENT_ID_DEFAULT = "test-application-client";
     static final String CLIENT_SECRET_DEFAULT = "test-application-client-secret";
     static final String NORMAL_USER = "test-normal-user";
 
-    @KeycloakContainer(runKeycloakInProdMode = true)
+    @KeycloakContainer(runKeycloakInProdMode = true, certificateFormat = Certificate.Format.PEM)
     static final KeycloakService keycloak = new KeycloakService(DEFAULT_REALM_FILE, DEFAULT_REALM, DEFAULT_REALM_BASE_PATH);
 
     private AuthzClient authzClient;
