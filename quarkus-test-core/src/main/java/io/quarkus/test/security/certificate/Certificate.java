@@ -90,9 +90,10 @@ public interface Certificate {
     }
 
     static Certificate of(String prefix, io.quarkus.test.services.Certificate.Format format, String password, Path targetDir,
-            ContainerMountStrategy containerMountStrategy, List<String> additionalSubjectAlternativeName) {
+            ContainerMountStrategy containerMountStrategy, List<String> additionalSubjectAlternativeName,
+            ClientCertificateRequest[] clientCertRequests) {
         return ofInterchangeable(new CertificateOptions(prefix, format, password, false, false, false,
-                new ClientCertificateRequest[0], targetDir, containerMountStrategy, false, null, null, null, null, false,
+                clientCertRequests, targetDir, containerMountStrategy, false, null, null, null, null, false,
                 null, false, additionalSubjectAlternativeName));
     }
 

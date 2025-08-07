@@ -28,6 +28,8 @@ public @interface KeycloakContainer {
 
     boolean runKeycloakInProdMode() default false;
 
+    boolean mtlsEnabled() default false;
+
     Certificate.Format certificateFormat() default Certificate.Format.PKCS12;
 
     Class<? extends ManagedResourceBuilder> builder() default KeycloakContainerManagedResourceBuilder.class;

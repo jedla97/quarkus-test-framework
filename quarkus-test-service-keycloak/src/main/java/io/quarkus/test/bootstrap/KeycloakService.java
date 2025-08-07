@@ -1,9 +1,11 @@
 package io.quarkus.test.bootstrap;
 
 import static io.quarkus.test.services.containers.KeycloakContainerManagedResourceBuilder.CERTIFICATE_CONTEXT_KEY;
+import static io.quarkus.test.services.containers.KeycloakContainerManagedResourceBuilder.KEYCLOAK_COMMON_NAME;
 import static io.quarkus.test.services.containers.KeycloakContainerManagedResourceBuilder.KEYCLOAK_PRODUCTION_MODE_KEY;
 import static io.quarkus.test.utils.PropertiesUtils.RESOURCE_WITH_DESTINATION_PREFIX;
 import static io.quarkus.test.utils.PropertiesUtils.SECRET_PREFIX;
+import static io.quarkus.test.utils.PropertiesUtils.SECRET_WITH_DESTINATION_PREFIX;
 import static io.quarkus.test.utils.TestExecutionProperties.isBareMetalPlatform;
 
 import java.net.URI;
@@ -30,6 +32,8 @@ import org.keycloak.authorization.client.Configuration;
 import io.quarkus.test.scenarios.OpenShiftDeploymentStrategy;
 import io.quarkus.test.scenarios.OpenShiftScenario;
 import io.quarkus.test.security.certificate.Certificate;
+import io.quarkus.test.security.certificate.ClientCertificate;
+import io.quarkus.test.security.certificate.PemClientCertificate;
 
 public class KeycloakService extends BaseService<KeycloakService> {
 
@@ -124,25 +128,66 @@ public class KeycloakService extends BaseService<KeycloakService> {
         return realmBasePath;
     }
 
-    public String getTrustStore() {
-        Certificate certBuilder = getPropertyFromContext(CERTIFICATE_CONTEXT_KEY);
-        if (certBuilder == null) {
-            throw new IllegalArgumentException("Unable to load CertificateBuilder.");
+    public String getTrustStore(Certificate certificate) {
+        String trustStore;
+
+        if (certificate.clientCertificates().isEmpty()) {
+            trustStore = certificate.truststorePath();
+        } else {
+            trustStore = getKeycloakClientCertificate(certificate).truststorePath();
         }
 
-        String trustStore = certBuilder.truststorePath();
         if (isBareMetalPlatform()) {
             return trustStore;
         } else {
             var deploymentStrategy = context.getScenarioContext().getAnnotation(OpenShiftScenario.class).deployment();
             if (deploymentStrategy.equals(OpenShiftDeploymentStrategy.Build)
                     || deploymentStrategy.equals(OpenShiftDeploymentStrategy.UsingContainerRegistry)) {
-                return SECRET_PREFIX + Path.of(trustStore).getFileName().toString();
+                return SECRET_PREFIX + getFileNameFromPath(trustStore);
             }
             // Don't need to mount it to openshift for UsingOpenShiftExtensionAndDockerBuildStrategy and UsingOpenShiftExtension
             // strategies as the key was copied to be present when building app
             // as part of KeycloakContainerManagedResourceBuilder#setUpProdKeycloak
-            return Path.of(trustStore).getFileName().toString();
+            return getFileNameFromPath(trustStore);
+        }
+    }
+
+    private String getKeyStore(Certificate certificate) {
+        String keyStore = getKeycloakClientCertificate(certificate).keystorePath();
+
+        if (isBareMetalPlatform()) {
+            return keyStore;
+        } else {
+            var deploymentStrategy = context.getScenarioContext().getAnnotation(OpenShiftScenario.class).deployment();
+            if (deploymentStrategy.equals(OpenShiftDeploymentStrategy.Build)
+                    || deploymentStrategy.equals(OpenShiftDeploymentStrategy.UsingContainerRegistry)) {
+                return SECRET_WITH_DESTINATION_PREFIX + "/keystore/|" + getFileNameFromPath(keyStore);
+            }
+            // Don't need to mount it to openshift for UsingOpenShiftExtensionAndDockerBuildStrategy and UsingOpenShiftExtension
+            // strategies as the key was copied to be present when building app
+            // as part of KeycloakContainerManagedResourceBuilder#setUpProdKeycloak
+            return getFileNameFromPath(keyStore);
+        }
+    }
+
+    private String[] getCertAndKey(Certificate certificate) {
+        var clientCertificate = (PemClientCertificate) getKeycloakClientCertificate(certificate);
+        String cert = clientCertificate.certPath();
+        String key = clientCertificate.keyPath();
+
+        if (isBareMetalPlatform()) {
+            return new String[] { cert, key };
+        } else {
+            var deploymentStrategy = context.getScenarioContext().getAnnotation(OpenShiftScenario.class).deployment();
+            if (deploymentStrategy.equals(OpenShiftDeploymentStrategy.Build)
+                    || deploymentStrategy.equals(OpenShiftDeploymentStrategy.UsingContainerRegistry)) {
+                return new String[] { SECRET_WITH_DESTINATION_PREFIX + "/cert/|" + getFileNameFromPath(cert),
+                        SECRET_WITH_DESTINATION_PREFIX + "/key/|" + getFileNameFromPath(key) };
+            }
+            // Don't need to mount it to openshift for UsingOpenShiftExtensionAndDockerBuildStrategy and UsingOpenShiftExtension
+            // strategies as the key was copied to be present when building app
+            // as part of KeycloakContainerManagedResourceBuilder#setUpProdKeycloak
+            return new String[] { getFileNameFromPath(cert), getFileNameFromPath(key) };
         }
     }
 
@@ -153,6 +198,9 @@ public class KeycloakService extends BaseService<KeycloakService> {
             final String additionalJdbcProperties = "quarkus.tls.oidc.trust-store.p12.";
             properties.put("quarkus.oidc.tls.tls-configuration-name", "oidc");
             properties.putAll(prepareTruststorePathProperty(cert));
+            if (!cert.clientCertificates().isEmpty()) {
+                properties.putAll(prepareKeystorePathProperty(cert));
+            }
             return properties;
         }
         return properties;
@@ -163,19 +211,54 @@ public class KeycloakService extends BaseService<KeycloakService> {
         switch (cert.format()) {
             case "PEM" -> {
                 return Map.of(
-                        tlsOidcPropertiesBase + "pem.certs", getTrustStore());
+                        tlsOidcPropertiesBase + "pem.certs", getTrustStore(cert));
             }
             case "PKCS12" -> {
                 return Map.of(
-                        tlsOidcPropertiesBase + "p12.path", getTrustStore(),
+                        tlsOidcPropertiesBase + "p12.path", getTrustStore(cert),
                         tlsOidcPropertiesBase + "p12.password", cert.password());
             }
             case "JKS" -> {
                 return Map.of(
-                        tlsOidcPropertiesBase + "jks.path", getTrustStore(),
+                        tlsOidcPropertiesBase + "jks.path", getTrustStore(cert),
                         tlsOidcPropertiesBase + "jks.password", cert.password());
             }
             default -> throw new IllegalArgumentException(cert.format() + " is not supported.");
         }
+    }
+
+    private Map<String, String> prepareKeystorePathProperty(Certificate cert) {
+        final String tlsOidcPropertiesBase = "quarkus.tls.oidc.key-store.";
+        switch (cert.format()) {
+            case "PEM" -> {
+                var certAndKey = getCertAndKey(cert);
+                return Map.of(
+                        tlsOidcPropertiesBase + "pem.cert", certAndKey[0],
+                        tlsOidcPropertiesBase + "pem.key", certAndKey[1]);
+            }
+            case "PKCS12" -> {
+                return Map.of(
+                        tlsOidcPropertiesBase + "p12.path", getKeyStore(cert),
+                        tlsOidcPropertiesBase + "p12.password", cert.password());
+            }
+            case "JKS" -> {
+                return Map.of(
+                        tlsOidcPropertiesBase + "jks.path", getKeyStore(cert),
+                        tlsOidcPropertiesBase + "jks.password", cert.password());
+            }
+            default -> throw new IllegalArgumentException(cert.format() + " is not supported.");
+        }
+    }
+
+    private String getFileNameFromPath(String path) {
+        return Path.of(path).getFileName().toString();
+    }
+
+    private ClientCertificate getKeycloakClientCertificate(Certificate certificate) {
+        var clientCertificate = certificate.getClientCertificateByCn(KEYCLOAK_COMMON_NAME);
+        if (clientCertificate == null) {
+            throw new IllegalStateException("Unable to load certificate with name keycloak.");
+        }
+        return clientCertificate;
     }
 }

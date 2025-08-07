@@ -16,6 +16,7 @@ import java.util.stream.Collectors;
 
 import io.quarkus.test.bootstrap.ManagedResource;
 import io.quarkus.test.bootstrap.ServiceContext;
+import io.quarkus.test.security.certificate.ClientCertificateRequest;
 import io.quarkus.test.security.certificate.FixedPathContainerMountStrategy;
 import io.quarkus.test.services.Certificate;
 import io.quarkus.test.services.KeycloakContainer;
@@ -25,13 +26,18 @@ public class KeycloakContainerManagedResourceBuilder extends ContainerManagedRes
 
     public static final String CERTIFICATE_CONTEXT_KEY = "io.quarkus.test.services.containers.keycloak.certificate";
     public static final String KEYCLOAK_PRODUCTION_MODE_KEY = "io.quarkus.test.services.keycloak.production.mode";
+    public static final String KEYCLOAK_COMMON_NAME = "keycloak";
 
     private static final String KEYSTORE_PREFIX = "keycloak";
     private static final String MOUNTED_KEYSTORE_NAME = KEYSTORE_PREFIX + "-keystore";
     private static final String KEYSTORE_DEST_PATH = "/opt/keycloak/conf/";
     private static final String MOUNTED_KEYSTORE_PATH = KEYSTORE_DEST_PATH + MOUNTED_KEYSTORE_NAME;
+    private static final String MOUNTED_TRUSTSTORE_NAME = KEYSTORE_PREFIX + "-server-truststore";
+    private static final String TRUSTSTORE_DEST_PATH = "/opt/keycloak/conf/truststore/";
+    private static final String MOUNTED_TRUSTSTORE_PATH = TRUSTSTORE_DEST_PATH + MOUNTED_TRUSTSTORE_NAME;
     private static final String MOUNTED_KEY_PATH = KEYSTORE_DEST_PATH + "key/" + KEYSTORE_PREFIX + ".key";
     private static final String MOUNTED_CERT_PATH = KEYSTORE_DEST_PATH + "cert/" + KEYSTORE_PREFIX + ".crt";
+    private static final String MOUNTED_PEM_TRUSTSTORE_PATH = TRUSTSTORE_DEST_PATH + KEYSTORE_PREFIX + "-server-ca.crt";
 
     private final ServiceLoader<KeycloakContainerManagedResourceBinding> managedResourceBindingsRegistry = ServiceLoader
             .load(KeycloakContainerManagedResourceBinding.class);
@@ -45,6 +51,7 @@ public class KeycloakContainerManagedResourceBuilder extends ContainerManagedRes
     private long memoryLimitMiB;
     private boolean runKeycloakInProdMode;
     private boolean sslEnabled;
+    private boolean mtlsEnabled;
     private Certificate.Format certificateFormat;
 
     @Override
@@ -86,8 +93,8 @@ public class KeycloakContainerManagedResourceBuilder extends ContainerManagedRes
         return memoryLimitMiB;
     }
 
-    protected boolean runKeycloakInProdMode() {
-        return runKeycloakInProdMode;
+    public boolean isMtlsEnabled() {
+        return mtlsEnabled;
     }
 
     protected Certificate.Format certificateFormat() {
@@ -104,6 +111,7 @@ public class KeycloakContainerManagedResourceBuilder extends ContainerManagedRes
         this.command = metadata.command();
         this.memoryLimitMiB = metadata.memoryLimitMiB();
         this.runKeycloakInProdMode = metadata.runKeycloakInProdMode();
+        this.mtlsEnabled = metadata.mtlsEnabled();
         this.certificateFormat = metadata.certificateFormat();
         // We want to set up sslEnable to same value as runKeycloakInProdMode as `isSslEnabled` is used to determine
         // if tls should be enabled
@@ -131,11 +139,9 @@ public class KeycloakContainerManagedResourceBuilder extends ContainerManagedRes
     private void setUpProdKeycloak(ServiceContext context) {
         String truststorePath = "";
         if (certificateFormat.equals(Certificate.Format.JKS) || certificateFormat.equals(Certificate.Format.PKCS12)) {
-            var destinationStrategy = new FixedPathContainerMountStrategy(null,
-                    MOUNTED_KEYSTORE_PATH + getSuffixOfStore(certificateFormat), null, null);
-
             var cert = io.quarkus.test.security.certificate.Certificate.of(KEYSTORE_PREFIX, certificateFormat,
-                    KEYSTORE_PASSWORD, certTargetDir(), destinationStrategy, getSubjectAlternativeName());
+                    KEYSTORE_PASSWORD, certTargetDir(), createDestinationStrategy(), getSubjectAlternativeName(),
+                    createCertificateRequest());
             truststorePath = cert.truststorePath();
 
             cert.configProperties().forEach(context::withTestScopeConfigProperty);
@@ -143,11 +149,9 @@ public class KeycloakContainerManagedResourceBuilder extends ContainerManagedRes
 
             enrichCommandByTlsCommands(false);
         } else if (certificateFormat.equals(Certificate.Format.PEM)) {
-            var destinationStrategy = new FixedPathContainerMountStrategy(null, null,
-                    MOUNTED_KEY_PATH, MOUNTED_CERT_PATH);
-
             var cert = io.quarkus.test.security.certificate.Certificate.of(KEYSTORE_PREFIX, certificateFormat,
-                    KEYSTORE_PASSWORD, certTargetDir(), destinationStrategy, getSubjectAlternativeName());
+                    KEYSTORE_PASSWORD, certTargetDir(), createDestinationStrategy(), getSubjectAlternativeName(),
+                    createCertificateRequest());
             truststorePath = cert.truststorePath();
 
             cert.configProperties().forEach(context::withTestScopeConfigProperty);
@@ -179,6 +183,18 @@ public class KeycloakContainerManagedResourceBuilder extends ContainerManagedRes
             list.add("--https-key-store-file=" + MOUNTED_KEYSTORE_PATH + getSuffixOfStore(certificateFormat));
             list.add("--https-key-store-password=" + KEYSTORE_PASSWORD);
         }
+
+        if (mtlsEnabled) {
+            String truststore;
+            if (isPemFormatUsed) {
+                truststore = MOUNTED_PEM_TRUSTSTORE_PATH;
+            } else {
+                list.add("--https-trust-store-password=" + KEYSTORE_PASSWORD);
+                truststore = MOUNTED_TRUSTSTORE_PATH + getSuffixOfStore(certificateFormat);
+            }
+            list.add("--https-trust-store-file=" + truststore);
+        }
+
         command = list.toArray(new String[0]);
     }
 
@@ -203,5 +219,25 @@ public class KeycloakContainerManagedResourceBuilder extends ContainerManagedRes
             case JKS -> ".jks";
             default -> throw new IllegalArgumentException(format + " is not supported to get suffix.");
         };
+    }
+
+    private ClientCertificateRequest[] createCertificateRequest() {
+        if (mtlsEnabled) {
+            return new ClientCertificateRequest[] { new ClientCertificateRequest(KEYCLOAK_COMMON_NAME, false) };
+        } else {
+            return new ClientCertificateRequest[0];
+        }
+    }
+
+    private FixedPathContainerMountStrategy createDestinationStrategy() {
+        String truststoreMountPath;
+        if (certificateFormat.equals(Certificate.Format.PEM)) {
+            truststoreMountPath = mtlsEnabled ? MOUNTED_PEM_TRUSTSTORE_PATH : null;
+            return new FixedPathContainerMountStrategy(truststoreMountPath, null, MOUNTED_KEY_PATH, MOUNTED_CERT_PATH);
+        } else {
+            truststoreMountPath = mtlsEnabled ? (MOUNTED_TRUSTSTORE_PATH + getSuffixOfStore(certificateFormat)) : null;
+            return new FixedPathContainerMountStrategy(truststoreMountPath,
+                    MOUNTED_KEYSTORE_PATH + getSuffixOfStore(certificateFormat), null, null);
+        }
     }
 }
