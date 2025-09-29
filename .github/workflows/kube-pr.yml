@@ -136,7 +136,7 @@ jobs:
     needs: [ write-comment, kubernetes-build-jvm-latest, kubernetes-build-native-latest ]
     if: always()
     steps:
-      - name: Update PR comment with status
+      - name: Update PR comment with status 1
         uses: actions/github-script@v7
         with:
           script: |
