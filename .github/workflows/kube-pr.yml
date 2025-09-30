@@ -61,13 +61,6 @@ jobs:
         uses: actions/checkout@v5
         with:
           ref: ${{ needs.write-comment.outputs.head_sha }}
-      - name: Rebase onto base branch
-        run: |
-          git remote add quarkus_qe_target_repo https://github.com/jedla97/quarkus-test-framework.git
-          git fetch quarkus_qe_target_repo ${{ needs.write-comment.outputs.base_ref }} --depth=15
-          git config user.email "qe@quarkus"
-          git config user.name "Quarkus QE"
-          git rebase quarkus_qe_target_repo/${{ needs.write-comment.outputs.base_ref }}
       - name: test
         if: always()
         run: |
