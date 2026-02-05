@@ -29,6 +29,7 @@
     </scm>
     <url>https://github.com/quarkus-qe/quarkus-test-framework/</url>
     <properties>
+        <!-- test line -->
         <compiler-plugin.version>3.15.0</compiler-plugin.version>
         <source-plugin.version>3.4.0</source-plugin.version>
         <javadoc-plugin.version>3.12.0</javadoc-plugin.version>
