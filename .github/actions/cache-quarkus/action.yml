@@ -18,4 +18,4 @@ runs:
       shell: bash
       # We need to do this because it's build on Linux runner and Windows have some problem with restoring cache using `~`
       run: |
-        mv maven-repository/ ~/.m2/repository/
+        mv maven-repositorys/ ~/.m2/repository/
